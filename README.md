@@ -3,7 +3,7 @@
 VibeOCM is a web application that leverages AI to generate professional Organizational Change Management (OCM) artifacts. It simplifies the creation of change management plans, communication strategies, and other OCM deliverables, saving time and ensuring consistency.
 
 ## Video Demo
-./assets/demo60.mp4
+https://github.com/user-attachments/assets/5f32e468-16b9-41bf-a6d8-bf313f577da6
 
 ## Features
 
