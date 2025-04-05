@@ -6,7 +6,7 @@ import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 
 // Import the captureThemeChange function
-import { captureThemeChange } from "@/lib/posthog"
+//import { captureThemeChange } from "@/lib/posthog"
 
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme()

@@ -92,10 +92,10 @@ function generateMockResponse(systemPrompt: string, userPrompt: string): string 
 
   // Extract project goal from the user prompt
   const goalMatch = userPrompt.match(/Project Goal: (.*?)(\n|$)/)
-  const projectGoal = goalMatch ? projectGoal[1] : "Implement organizational change"
+  const projectGoal = goalMatch ? goalMatch[1] : "Implement organizational change"
 
   // Extract stakeholders from the user prompt
-  const stakeholdersMatch = userPrompt.match(/Stakeholders:(.*?)(\n\n|$)/s)
+  const stakeholdersMatch = userPrompt.match(/Stakeholders:([^]*?)(\n\n|$)/)
   const stakeholders = stakeholdersMatch ? stakeholdersMatch[1].trim() : "- Leadership Team\n- Employees\n- Customers"
 
   // Generate a comprehensive response based on the artifact type
