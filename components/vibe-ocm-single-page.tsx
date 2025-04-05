@@ -697,7 +697,6 @@ export function VibeOCMSinglePage() {
                 loop
                 muted
                 playsInline
-                poster="/images/video-poster.jpg"
               >
                 <source
                   src="/video/60 second recording 2025-04-01 111708 - vibeocm-smartways.work.mp4"
