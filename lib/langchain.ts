@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai"
 import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate } from "@langchain/core/prompts"
 import { logger } from "@/lib/logger"
-import { captureLLMMetrics } from "@/lib/posthog"
+//import { captureLLMMetrics } from "@/lib/posthog"
 import type { ProjectData } from "@/components/vibe-ocm-single-page"
 import type { ApiProvider } from "@/lib/types"
 import { SYSTEM_PROMPT, ARTIFACT_TYPE_TO_PROMPT, formatPromptWithProjectData } from "@/prompts.config"
@@ -65,32 +65,63 @@ function createOpenAIChatModel(config: LangChainConfig) {
  */
 async function callMistralAPI(systemPrompt: string, userPrompt: string, config: LangChainConfig): Promise<string> {
   const { apiKey, model, temperature = 0.7, maxTokens = 2000 } = config
+  const maxRetries = 3
+  let lastError: Error | null = null
 
-  const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: temperature,
-      max_tokens: maxTokens,
-    }),
-  })
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: temperature,
+          max_tokens: maxTokens,
+        }),
+      })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: { message: "Unknown error" } }))
-    const errorMessage = errorData.error?.message || `Mistral API request failed with status ${response.status}`
-    throw new Error(errorMessage)
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        const errorMessage = responseData.error?.message || 
+                           responseData.detail || 
+                           `Mistral API request failed with status ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      if (!responseData.choices?.[0]?.message?.content) {
+        throw new Error("Invalid response format from Mistral API")
+      }
+
+      return responseData.choices[0].message.content
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      
+      // Log the attempt failure
+      logger.warn(`Mistral API attempt ${attempt + 1} failed:`, {
+        error: lastError.message,
+        attempt: attempt + 1,
+        maxRetries
+      })
+
+      // Only wait and retry if we haven't reached max retries
+      if (attempt < maxRetries - 1) {
+        // Exponential backoff: wait longer between each retry
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+        continue
+      }
+    }
   }
 
-  const data = await response.json()
-  return data.choices[0].message.content
+  // If we've exhausted all retries, throw the last error
+  throw new Error(`Failed to call Mistral API after ${maxRetries} attempts: ${lastError?.message}`)
 }
 
 /**
@@ -156,32 +187,13 @@ export async function generateOCMArtifactWithLangChain(
       usedLangChain: config.apiProvider === "openai",
     })
 
-    captureLLMMetrics({
-      provider: config.apiProvider,
-      model: config.model,
-      latencyMs,
-      success: true,
-      artifactType,
-      usedLangChain: config.apiProvider === "openai",
-    })
-
     return result
+
   } catch (error) {
     const latencyMs = Date.now() - startTime
 
     // Log the error
     logger.error(`Failed to generate ${artifactType} with ${config.apiProvider}`, error)
-
-    // Capture error metrics
-    captureLLMMetrics({
-      provider: config.apiProvider,
-      model: config.model,
-      latencyMs,
-      success: false,
-      errorType: error instanceof Error ? error.name : "Unknown",
-      artifactType,
-      usedLangChain: config.apiProvider === "openai",
-    })
 
     // Provide a more helpful error message
     let errorMessage = `Failed to generate ${artifactType}. `
@@ -218,4 +230,6 @@ export function getDefaultModelForProvider(provider: ApiProvider): string {
     throw new Error(`Unsupported API provider: ${provider}`)
   }
 }
+
+export const DEFAULT_MISTRAL_API_KEY = process.env.NEXT_PUBLIC_MISTRAL_API_KEY || '';
 

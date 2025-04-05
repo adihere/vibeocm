@@ -215,7 +215,7 @@ ${stakeholders.map(s => `- **${s.role}**: ${s.impact}`).join('\n')}
 ## Anticipated Challenges
 ${challenges}
 
-## Change Strategy
+## SAMPLE Change Strategy
 Based on the project context and stakeholders involved, we recommend a phased approach to implementing this change:
 
 1. **Awareness Phase** (Weeks 1-2)

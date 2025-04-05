@@ -335,7 +335,6 @@ The implementation of ${projectName} requires a structured approach to ensure su
   }
 }
 
-// Update the callMistralAPI function to better handle trial mode
 async function callMistralAPI(systemPrompt: string, userPrompt: string, config: ApiConfig): Promise<string> {
   // If using passphrase or trial authentication, use the default Mistral API key
   let apiKey = config.apiKey
@@ -407,6 +406,7 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: { message: "Unknown error" } }))
       const errorMessage = errorData.error?.message || `Mistral API request failed with status ${response.status}`
+      console.error("Mistral API error:", errorMessage)
 
       // If in trial mode and API call fails, fall back to mock response
       if (config.authMethod === "trial") {

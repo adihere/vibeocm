@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { ApiProvider } from './vibe-ocm-single-page'
 import { HeroSection } from '@/components/sections/hero-section'
 import { ToolOverviewSection } from '@/components/sections/tool-overview-section'
 import { HowItWorksSection } from '@/components/sections/how-it-works-section'
@@ -10,6 +11,8 @@ import { ResultsSection } from '@/components/sections/results-section'
 import { RefinementSection } from '@/components/sections/refinement-section'
 
 // Define the types for our form data
+import { AuthMethod } from './vibe-ocm-single-page'
+
 export interface ProjectData {
   // Project Basics
   name: string
@@ -25,6 +28,10 @@ export interface ProjectData {
   orgBenefits: string
   userBenefits: string
   challenges: string
+  // API Configuration
+  apiKey: string
+  apiProvider: ApiProvider
+  authMethod: AuthMethod
 }
 
 // Define the possible workflow steps
@@ -40,8 +47,6 @@ export function VibeOCMApp() {
   // Refs for scrolling to sections
   const formSectionRef = useRef<HTMLDivElement>(null)
   const resultsSectionRef = useRef<HTMLDivElement>(null)
-  
-  // State for workflow
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('project-basics')
   const [projectData, setProjectData] = useState<ProjectData>({
     name: '',
@@ -52,7 +57,10 @@ export function VibeOCMApp() {
     impactedUsers: 0,
     orgBenefits: '',
     userBenefits: '',
-    challenges: ''
+    challenges: '',
+    apiKey: '',
+    apiProvider: 'OPENAI',
+    authMethod: ''
   })
   const [selectedArtifact, setSelectedArtifact] = useState<string>('')
   const [generatedContent, setGeneratedContent] = useState<string>('')
@@ -212,6 +220,8 @@ export function VibeOCMApp() {
             onSelect={handleArtifactSelect}
             isGenerating={isGenerating}
             onBack={goBack}
+            onFeelingLazy={() => handleArtifactSelect('Change Management Plan')}
+            projectData={projectData}
           />
         )}
         
@@ -228,7 +238,7 @@ export function VibeOCMApp() {
               />
             ) : (
               <RefinementSection 
-                currentContent={generatedContent}
+                content={generatedContent}
                 history={refinementHistory}
                 onSubmit={handleRefinementSubmit}
                 onBack={goBack}

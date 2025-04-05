@@ -11,27 +11,30 @@ import { AlertCircle, RefreshCw } from "lucide-react"
 
 interface RefinementSectionProps {
   content: string
+  history: string[] // Add history prop
   artifactType: string
-  isRefining: boolean
-  error: string | null
-  onRefine: (feedback: string) => void
+  isSubmitting: boolean // Change isRefining to isSubmitting to match usage
+  error?: string | null // Make error optional since some usages don't provide it
+  onSubmit: (feedback: string, focus: string[]) => Promise<void> // Update to match usage
   onBack: () => void
 }
 
 export function RefinementSection({
   content,
+  history, // Add history to destructuring
   artifactType,
-  isRefining,
+  isSubmitting, // Change prop name
   error,
-  onRefine,
+  onSubmit, // Change onRefine to onSubmit
   onBack,
 }: RefinementSectionProps) {
   const [feedback, setFeedback] = useState("")
+  const [focusAreas, setFocusAreas] = useState<string[]>([]) // Add state for focus areas
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (feedback.trim()) {
-      onRefine(feedback)
+      onSubmit(feedback, focusAreas) // Pass both feedback and focus areas
     }
   }
 
@@ -68,16 +71,16 @@ export function RefinementSection({
                     onChange={(e) => setFeedback(e.target.value)}
                     rows={8}
                     className="resize-y"
-                    disabled={isRefining}
+                    disabled={isSubmitting}
                   />
                 </div>
 
                 <div className="flex justify-between">
-                  <Button type="button" variant="outline" onClick={onBack} disabled={isRefining}>
+                  <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting}>
                     Back to Results
                   </Button>
-                  <Button type="submit" disabled={isRefining || !feedback.trim()}>
-                    {isRefining ? (
+                  <Button type="submit" disabled={isSubmitting || !feedback.trim()}>
+                    {isSubmitting ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                         Refining...

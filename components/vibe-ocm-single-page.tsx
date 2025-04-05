@@ -12,8 +12,9 @@ import { RefinementSection } from "@/components/sections/refinement-section"
 import { ProgressIndicator } from "@/components/progress-indicator"
 import { logger } from "@/lib/logger"
 import { captureEvent } from "@/lib/posthog"
-import { generateOCMArtifact, validatePassphrase } from "@/lib/ai-client"
+import { validatePassphrase } from "@/lib/ai-client"
 import { getDefaultModelForProvider } from "@/lib/ai-client"
+import { generateOCMArtifactWithLangChain, DEFAULT_MISTRAL_API_KEY } from "@/lib/langchain"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import type { ApiProvider } from "@/lib/types"
@@ -96,6 +97,19 @@ const ALL_ARTIFACTS = [
   "Stakeholder Engagement Strategy",
   "Feedback Survey Templates",
 ]
+
+/**
+ * Configuration for LangChain API calls
+ */
+export interface LangChainConfig {
+  apiKey: string
+  apiProvider: string
+  model: string
+  maxTokens: number
+  temperature: number
+  refinementFeedback?: string
+  currentContent?: string
+}
 
 /**
  * Main component for the VibeOCM single-page application
@@ -310,41 +324,25 @@ export function VibeOCMSinglePage() {
     }
   }
 
-  // Find the handleArtifactSelect function and update it to check for trial mode availability
   const handleArtifactSelect = async (artifact: string) => {
     setSelectedArtifact(artifact)
     setIsGenerating(true)
     setAppError(null)
 
     try {
-      // Remove the trial mode availability check
-      // We'll allow trial mode to proceed regardless of DEFAULT_MISTRAL_API_KEY
+      // Get the appropriate API key based on auth method
+      const apiKey = projectData.authMethod === "trial" ? 
+        DEFAULT_MISTRAL_API_KEY : 
+        projectData.apiKey;
 
-      // Log the artifact generation attempt
-      logger.info(`Generating artifact: ${artifact}`, {
-        projectName: projectData.name,
-        provider: projectData.apiProvider,
-        authMethod: projectData.authMethod,
-      })
+      // Get the default model
+      const model = getDefaultModelForProvider("mistral")
 
-      // Track the artifact generation event
-      captureEvent("generate_artifact", {
-        artifactType: artifact,
-        projectName: projectData.name,
-        provider: projectData.apiProvider,
-        authMethod: projectData.authMethod,
-      })
-
-      // Get the default model for the selected provider
-      const model = getDefaultModelForProvider(projectData.apiProvider)
-
-      // Generate the artifact content
-      const content = await generateOCMArtifact(artifact, projectData, {
-        apiKey: projectData.apiKey,
-        apiProvider: projectData.apiProvider,
-        authMethod: projectData.authMethod,
-        passphrase: projectData.passphrase,
-        model: model,
+      // Generate the artifact content using LangChain
+      const content = await generateOCMArtifactWithLangChain(artifact, projectData, {
+        apiKey,
+        apiProvider: "mistral",
+        model,
         maxTokens: 2000,
         temperature: 0.7,
       })
@@ -428,12 +426,10 @@ export function VibeOCMSinglePage() {
 
         try {
           // Generate the artifact content
-          const content = await generateOCMArtifact(artifact, projectData, {
-            apiKey: projectData.apiKey,
-            apiProvider: projectData.apiProvider,
-            authMethod: projectData.authMethod,
-            passphrase: projectData.passphrase,
-            model: model,
+          const content = await generateOCMArtifactWithLangChain(artifact, projectData, {
+            apiKey: projectData.authMethod === "trial" ? DEFAULT_MISTRAL_API_KEY : projectData.apiKey,
+            apiProvider: "mistral",
+            model,
             maxTokens: 2000,
             temperature: 0.7,
           })
@@ -504,44 +500,22 @@ export function VibeOCMSinglePage() {
     }
   }
 
-  /**
-   * Handles content refinement
-   * Calls the API to refine the existing content based on feedback
-   *
-   * @param feedback - The user's feedback for refinement
-   */
   const handleRefinement = async (feedback: string) => {
     setIsRefining(true)
     setAppError(null)
 
     try {
-      // Log the refinement attempt
-      logger.info(`Refining artifact: ${selectedArtifact}`, {
-        projectName: projectData.name,
-        provider: projectData.apiProvider,
-        authMethod: projectData.authMethod,
-        feedback: feedback.substring(0, 100) + (feedback.length > 100 ? "..." : ""),
-      })
+      const apiKey = projectData.authMethod === "trial" ? 
+        DEFAULT_MISTRAL_API_KEY : 
+        projectData.apiKey;
 
-      // Track the refinement event
-      captureEvent("refine_artifact", {
-        artifactType: selectedArtifact,
-        projectName: projectData.name,
-        provider: projectData.apiProvider,
-        authMethod: projectData.authMethod,
-        feedbackLength: feedback.length,
-      })
+      const model = getDefaultModelForProvider("mistral")
 
-      // Get the default model for the selected provider
-      const model = getDefaultModelForProvider(projectData.apiProvider)
-
-      // Refine the artifact content
-      const refinedContent = await generateOCMArtifact(selectedArtifact, projectData, {
-        apiKey: projectData.apiKey,
-        apiProvider: projectData.apiProvider,
-        authMethod: projectData.authMethod,
-        passphrase: projectData.passphrase,
-        model: model,
+      // Refine the artifact content using LangChain
+      const refinedContent = await generateOCMArtifactWithLangChain(selectedArtifact, projectData, {
+        apiKey,
+        apiProvider: "mistral",
+        model,
         maxTokens: 2000,
         temperature: 0.7,
         refinementFeedback: feedback,
