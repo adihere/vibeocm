@@ -7,6 +7,8 @@
  */
 
 const bcrypt = require("bcryptjs")
+const fs = require("fs")
+const path = require("path")
 
 async function generateHash() {
   // Get the passphrase from command line arguments
@@ -18,16 +20,29 @@ async function generateHash() {
     process.exit(1)
   }
 
-  // Generate a salt with cost factor 12
-  const salt = await bcrypt.genSalt(12)
+  try {
+    // Generate a salt with cost factor 12
+    const salt = await bcrypt.genSalt(12)
 
-  // Hash the passphrase with the salt
-  const hash = await bcrypt.hash(passphrase, salt)
+    // Hash the passphrase with the salt
+    const hash = await bcrypt.hash(passphrase, salt)
 
-  console.log("Generated bcrypt hash (cost factor 12):")
-  console.log(hash)
-  console.log("\nAdd this to your .env file as:")
-  console.log(`HASHED_PASSPHRASE="${hash}"`)
+    console.log("Generated bcrypt hash (cost factor 12):")
+    console.log(hash)
+    
+    // Create or update .env file
+    const envPath = path.join(__dirname, "../.env")
+    const envContent = `HASHED_PASSPHRASE="${hash}"\n`
+
+    fs.writeFileSync(envPath, envContent, { flag: 'w' })
+
+    console.log("\nHash has been automatically added to .env file at:")
+    console.log(envPath)
+    console.log("\nYou can now use this passphrase for authentication.")
+  } catch (error) {
+    console.error("Error generating hash:", error)
+    process.exit(1)
+  }
 }
 
 generateHash().catch(console.error)
