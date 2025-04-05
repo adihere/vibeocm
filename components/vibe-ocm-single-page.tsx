@@ -685,28 +685,6 @@ export function VibeOCMSinglePage() {
             </div>
           )}
 
-          {/* Hero Section with Video */}
-          <div className="container mx-auto grid md:grid-cols-2 gap-8 px-4 py-12">
-            <div className="md:w-1/2 flex flex-col justify-center">
-              <HeroSection onGetStarted={() => scrollToSection("api-key")} />
-            </div>
-            <div className="md:w-1/2 relative h-[300px] md:h-[400px] bg-white rounded-lg shadow-lg overflow-hidden">
-              <video
-                className="w-full h-full object-cover"
-                autoPlay
-                loop
-                muted
-                playsInline
-              >
-                <source
-                  src="/video/60 second recording 2025-04-01 111708 - vibeocm-smartways.work.mp4"
-                  type="video/mp4"
-                />
-                Your browser does not support the video tag.
-              </video>
-            </div>
-          </div>
-
           {/* API Key Section (Step 0) */}
           <div id="step0" ref={apiKeySectionRef} className="section">
             <ApiKeySection

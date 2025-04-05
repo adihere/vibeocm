@@ -73,7 +73,7 @@ export function ApiKeySection({
   onSubmit,
   initialValue,
   initialProvider = "openai",
-  initialAuthMethod = "openai",
+  initialAuthMethod = "trial",
   initialPassphrase = "",
   isLoading,
 }: ApiKeySectionProps) {
@@ -90,7 +90,7 @@ export function ApiKeySection({
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false)
 
   // State for authentication method
-  const [authMethod, setAuthMethod] = useState<AuthMethod>(initialAuthMethod || "trial")
+  const [authMethod, setAuthMethod] = useState<AuthMethod>("trial") // Set "trial" as the default option
 
   // State for API provider selection (only used when authMethod is not "passphrase")
   const [apiProvider, setApiProvider] = useState<ApiProvider>(initialProvider)
