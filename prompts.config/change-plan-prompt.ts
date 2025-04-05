@@ -21,11 +21,12 @@ PROJECT CONTEXT:
 - Challenges: {challenges}
 
 INSTRUCTIONS:
-Create a focused Change Management Plan with these sections:
+Create a focused Change Management Plan with these sections based on the provided project context. Each section MUST be clear and actionable, using bullet points where appropriate. 
+The plan should be structured as follows:
 
 1. Executive Summary (3-4 sentences summarizing the change and approach)
 
-2. Project Timeline (list 4-5 key milestones with dates)
+2. Project Timeline (list 4-5 key milestones with blank dates and brief descriptions)
 
 3. Stakeholder Analysis (identify 3-4 stakeholder groups, their interests, and engagement strategies)
 

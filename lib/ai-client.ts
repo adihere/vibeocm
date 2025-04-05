@@ -1,5 +1,4 @@
 import { logger } from "@/lib/logger"
-import { captureLLMMetrics } from "@/lib/posthog"
 import type { ProjectData } from "@/components/vibe-ocm-single-page"
 import type { ApiProvider } from "@/lib/types"
 import { SYSTEM_PROMPT, ARTIFACT_TYPE_TO_PROMPT, formatPromptWithProjectData } from "@/prompts.config"
@@ -93,7 +92,7 @@ function generateMockResponse(systemPrompt: string, userPrompt: string): string 
 
   // Extract project goal from the user prompt
   const goalMatch = userPrompt.match(/Project Goal: (.*?)(\n|$)/)
-  const projectGoal = goalMatch ? goalMatch[1] : "Implement organizational change"
+  const projectGoal = goalMatch ? projectGoal[1] : "Implement organizational change"
 
   // Extract stakeholders from the user prompt
   const stakeholdersMatch = userPrompt.match(/Stakeholders:(.*?)(\n\n|$)/s)
@@ -363,7 +362,7 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
     }
   }
 
-  const { model = "mistral-small-latest", temperature = 0.7, maxTokens = 2000 } = config
+  const { model = "mistral-small-latest", temperature = 0.7, maxTokens = 4000 } = config
 
   const messages = [
     { role: "system", content: systemPrompt },
@@ -553,16 +552,17 @@ export async function generateOCMArtifact(
       isTrial,
     })
 
-    captureLLMMetrics({
-      provider: config.apiProvider,
-      authMethod: config.authMethod || config.apiProvider,
-      model: model,
-      latencyMs,
-      success: true,
-      artifactType,
-      isRefinement,
-      isPassphrase: isPassphrase || isTrial,
-    })
+    // Temporarily disable PostHog analytics
+    // captureLLMMetrics({
+    //   provider: config.apiProvider,
+    //   authMethod: config.authMethod || config.apiProvider,
+    //   model: model,
+    //   latencyMs,
+    //   success: true,
+    //   artifactType,
+    //   isRefinement,
+    //   isPassphrase: isPassphrase || isTrial,
+    // })
 
     return result
   } catch (error) {
@@ -571,18 +571,18 @@ export async function generateOCMArtifact(
     // Log the error
     logger.error(`Failed to ${isRefinement ? "refine" : "generate"} ${artifactType} with ${config.apiProvider}`, error)
 
-    // Capture error metrics
-    captureLLMMetrics({
-      provider: config.apiProvider,
-      authMethod: config.authMethod || config.apiProvider,
-      model: config.model || getDefaultModelForProvider(config.apiProvider),
-      latencyMs,
-      success: false,
-      errorType: error instanceof Error ? error.name : "Unknown",
-      artifactType,
-      isRefinement,
-      isPassphrase: isPassphrase || isTrial,
-    })
+    // Temporarily disable PostHog analytics
+    // captureLLMMetrics({
+    //   provider: config.apiProvider,
+    //   authMethod: config.authMethod || config.apiProvider,
+    //   model: config.model || getDefaultModelForProvider(config.apiProvider),
+    //   latencyMs,
+    //   success: false,
+    //   errorType: error instanceof Error ? error.name : "Unknown",
+    //   artifactType,
+    //   isRefinement,
+    //   isPassphrase: isPassphrase || isTrial,
+    // })
 
     // Provide a more helpful error message
     let errorMessage = `Failed to generate ${artifactType}. `
