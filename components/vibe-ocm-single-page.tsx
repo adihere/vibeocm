@@ -18,10 +18,20 @@ import { generateOCMArtifactWithLangChain, DEFAULT_MISTRAL_API_KEY } from "@/lib
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import type { ApiProvider } from "@/lib/types"
-import type { AuthMethod } from "@/components/sections/api-key-section"
+import type { AuthMethod as ImportedAuthMethod } from "@/components/sections/api-key-section"
 import JSZip from "jszip"
 import FileSaver from "file-saver"
 import { TooltipProvider } from "@/components/ui/tooltip"
+
+/**
+ * Auth method type for the OCM workflow
+ * Represents different authentication methods available
+ */
+export type AuthMethod = 
+  | "openai"
+  | "mistral" 
+  | "passphrase"
+  | "trial";
 
 /**
  * Project data structure for the OCM workflow
@@ -30,28 +40,20 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 export interface ProjectData {
   /** API key provided by the user */
   apiKey: string
-
   /** API provider selected by the user */
-  apiProvider: ApiProvider
-
+  apiProvider: "openai" | "mistral"
   /** Authentication method selected by the user */
   authMethod: AuthMethod
-
   /** Passphrase (if using passphrase authentication) */
   passphrase?: string
-
   /** Name of the project or change initiative */
   name: string
-
   /** Description of the project's goal or objective */
   goal: string
-
   /** Project start date in ISO format (YYYY-MM-DD) */
   startDate: string
-
   /** Project end date in ISO format (YYYY-MM-DD) */
   endDate: string
-
   /** List of stakeholders affected by the change */
   stakeholders: Array<{
     /** Stakeholder role or group (e.g., "Department Managers") */
@@ -59,16 +61,12 @@ export interface ProjectData {
     /** Description of how the stakeholder is impacted (e.g., "High - Daily workflow changes") */
     impact: string
   }>
-
   /** Estimated number of users impacted by the change */
   impactedUsers: number
-
   /** Benefits to the organization from implementing the change */
   orgBenefits: string
-
   /** Benefits to end users from implementing the change */
   userBenefits: string
-
   /** Expected challenges during implementation */
   challenges: string
 }
@@ -120,10 +118,8 @@ export interface LangChainConfig {
 export function VibeOCMSinglePage() {
   // State for current visible section
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("hero")
-
   // State for general application errors
   const [appError, setAppError] = useState<string | null>(null)
-
   // Refs for scrolling to sections
   const apiKeySectionRef = useRef<HTMLDivElement>(null)
   const projectBasicsSectionRef = useRef<HTMLDivElement>(null)
@@ -132,7 +128,6 @@ export function VibeOCMSinglePage() {
   const artifactSectionRef = useRef<HTMLDivElement>(null)
   const resultsSectionRef = useRef<HTMLDivElement>(null)
   const refinementSectionRef = useRef<HTMLDivElement>(null)
-
   // State for form data
   const [projectData, setProjectData] = useState<ProjectData>({
     apiKey: "",
@@ -148,19 +143,16 @@ export function VibeOCMSinglePage() {
     userBenefits: "",
     challenges: "",
   })
-
   // State for artifact generation
-  const [selectedArtifact, setSelectedArtifact] = useState<string>("")
-  const [generatedContent, setGeneratedContent] = useState<string>("")
+  const [selectedArtifact, setSelectedArtifact] = useState("")
+  const [generatedContent, setGeneratedContent] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isRefining, setIsRefining] = useState(false)
-
   // State for "I AM FEELING LAZY" functionality
   const [isLazyGenerating, setIsLazyGenerating] = useState(false)
   const [lazyProgress, setLazyProgress] = useState(0)
   const [currentLazyArtifact, setCurrentLazyArtifact] = useState("")
-  const [generatedArtifacts, setGeneratedArtifacts] = useState<Record<string, string>>({})
-
+  const [generatedArtifacts, setGeneratedArtifacts] = useState({})
   const [isLoading, setIsLoading] = useState(false)
 
   /**
@@ -172,11 +164,9 @@ export function VibeOCMSinglePage() {
   const scrollToSection = (step: WorkflowStep) => {
     try {
       setCurrentStep(step)
-
       // Track step navigation
       captureEvent("navigate_step", { step })
       logger.info(`Navigating to step: ${step}`)
-
       let ref = null
       switch (step) {
         case "api-key":
@@ -222,7 +212,6 @@ export function VibeOCMSinglePage() {
   ) => {
     try {
       setIsLoading(true)
-
       // If using passphrase, validate it
       if (authMethod === "passphrase") {
         if (!passphrase) {
@@ -232,7 +221,6 @@ export function VibeOCMSinglePage() {
 
         // Validate the passphrase against the stored hash
         const isValid = await validatePassphrase(passphrase)
-
         if (!isValid) {
           setAppError("Invalid passphrase. Please try again.")
           return
@@ -328,16 +316,13 @@ export function VibeOCMSinglePage() {
     setSelectedArtifact(artifact)
     setIsGenerating(true)
     setAppError(null)
-
     try {
       // Get the appropriate API key based on auth method
-      const apiKey = projectData.authMethod === "trial" ? 
-        DEFAULT_MISTRAL_API_KEY : 
+      const apiKey = projectData.authMethod === "trial" ?
+        DEFAULT_MISTRAL_API_KEY :
         projectData.apiKey;
-
       // Get the default model
       const model = getDefaultModelForProvider("mistral")
-
       // Generate the artifact content using LangChain
       const content = await generateOCMArtifactWithLangChain(artifact, projectData, {
         apiKey,
@@ -346,23 +331,19 @@ export function VibeOCMSinglePage() {
         maxTokens: 2000,
         temperature: 0.7,
       })
-
       // Store the generated artifact
       setGeneratedArtifacts((prev) => ({
         ...prev,
         [artifact]: content,
       }))
-
       // Set the generated content and navigate to results
       setGeneratedContent(content)
       scrollToSection("results")
     } catch (error) {
       // Log the error
       logger.error(`Error generating ${artifact}`, error)
-
       // Set a more detailed error message
       let errorMessage = `Failed to generate ${artifact}. `
-
       if (error instanceof Error) {
         errorMessage += error.message
       } else {
@@ -375,7 +356,6 @@ export function VibeOCMSinglePage() {
           errorMessage += `Please check your ${projectData.apiProvider} API key and try again.`
         }
       }
-
       setAppError(errorMessage)
     } finally {
       setIsGenerating(false)
@@ -390,7 +370,6 @@ export function VibeOCMSinglePage() {
     setIsLazyGenerating(true)
     setLazyProgress(0)
     setAppError(null)
-
     try {
       // Log the lazy generation attempt
       logger.info("Starting lazy generation of all artifacts", {
@@ -398,32 +377,25 @@ export function VibeOCMSinglePage() {
         provider: projectData.apiProvider,
         authMethod: projectData.authMethod,
       })
-
       // Track the lazy generation event
       captureEvent("lazy_generation", {
         projectName: projectData.name,
         provider: projectData.apiProvider,
         authMethod: projectData.authMethod,
       })
-
       // Get the default model for the selected provider
       const model = getDefaultModelForProvider(projectData.apiProvider)
-
       // Create a new ZIP file
       const zip = new JSZip()
-
       // Generate each artifact
       const generatedContents: Record<string, string> = {}
-
       for (let i = 0; i < ALL_ARTIFACTS.length; i++) {
         const artifact = ALL_ARTIFACTS[i]
         setCurrentLazyArtifact(artifact)
-
         // Update progress
         const progressStart = (i / ALL_ARTIFACTS.length) * 100
         const progressEnd = ((i + 1) / ALL_ARTIFACTS.length) * 100
         setLazyProgress(progressStart)
-
         try {
           // Generate the artifact content
           const content = await generateOCMArtifactWithLangChain(artifact, projectData, {
@@ -433,25 +405,20 @@ export function VibeOCMSinglePage() {
             maxTokens: 2000,
             temperature: 0.7,
           })
-
           // Store the generated content
           generatedContents[artifact] = content
-
           // Add the artifact to the ZIP file
           const fileName = `${artifact.replace(/\s+/g, "-").toLowerCase()}.md`
           zip.file(fileName, content)
-
           // Update progress
           setLazyProgress(progressEnd)
         } catch (error) {
           // Log the error but continue with other artifacts
           logger.error(`Error generating ${artifact} during lazy generation`, error)
-
           // Add a placeholder file for the failed artifact
           const errorMessage = `Failed to generate ${artifact}. Please try generating this artifact individually.`
           const fileName = `${artifact.replace(/\s+/g, "-").toLowerCase()}-ERROR.md`
           zip.file(fileName, errorMessage)
-
           // Update progress
           setLazyProgress(progressEnd)
         }
@@ -459,16 +426,12 @@ export function VibeOCMSinglePage() {
 
       // Store all generated artifacts
       setGeneratedArtifacts(generatedContents)
-
       // Generate the ZIP file
       const zipBlob = await zip.generateAsync({ type: "blob" })
-
       // Download the ZIP file
       FileSaver.saveAs(zipBlob, `${projectData.name.replace(/\s+/g, "-").toLowerCase()}-ocm-artifacts.zip`)
-
       // Show success message
       alert("Your artifacts have been successfully generated and downloaded!")
-
       // If at least one artifact was generated, show it in the results
       const firstArtifact = Object.keys(generatedContents)[0]
       if (firstArtifact) {
@@ -479,10 +442,8 @@ export function VibeOCMSinglePage() {
     } catch (error) {
       // Log the error
       logger.error("Error during lazy generation", error)
-
       // Set a more detailed error message
       let errorMessage = "Failed to generate all artifacts. "
-
       if (error instanceof Error) {
         errorMessage += error.message
       } else {
@@ -493,7 +454,6 @@ export function VibeOCMSinglePage() {
           errorMessage += `Please check your ${projectData.apiProvider} API key and try again.`
         }
       }
-
       setAppError(errorMessage)
     } finally {
       setIsLazyGenerating(false)
@@ -503,14 +463,11 @@ export function VibeOCMSinglePage() {
   const handleRefinement = async (feedback: string) => {
     setIsRefining(true)
     setAppError(null)
-
     try {
-      const apiKey = projectData.authMethod === "trial" ? 
-        DEFAULT_MISTRAL_API_KEY : 
+      const apiKey = projectData.authMethod === "trial" ?
+        DEFAULT_MISTRAL_API_KEY :
         projectData.apiKey;
-
       const model = getDefaultModelForProvider("mistral")
-
       // Refine the artifact content using LangChain
       const refinedContent = await generateOCMArtifactWithLangChain(selectedArtifact, projectData, {
         apiKey,
@@ -521,23 +478,19 @@ export function VibeOCMSinglePage() {
         refinementFeedback: feedback,
         currentContent: generatedContent,
       })
-
       // Update the stored artifact
       setGeneratedArtifacts((prev) => ({
         ...prev,
         [selectedArtifact]: refinedContent,
       }))
-
       // Set the refined content and navigate back to results
       setGeneratedContent(refinedContent)
       scrollToSection("results")
     } catch (error) {
       // Log the error
       logger.error(`Error refining ${selectedArtifact}`, error)
-
       // Set a more detailed error message
       let errorMessage = `Failed to refine ${selectedArtifact}. `
-
       if (error instanceof Error) {
         errorMessage += error.message
       } else {
@@ -548,12 +501,12 @@ export function VibeOCMSinglePage() {
           errorMessage += `Please check your ${projectData.apiProvider} API key and try again.`
         }
       }
-
       setAppError(errorMessage)
     } finally {
       setIsRefining(false)
     }
   }
+
 
   /**
    * Navigates to the previous step based on the current step
@@ -714,10 +667,11 @@ export function VibeOCMSinglePage() {
             <RefinementSection
               content={generatedContent}
               artifactType={selectedArtifact}
-              isRefining={isRefining}
+              isSubmitting={isRefining}
               error={appError}
-              onRefine={handleRefinement}
               onBack={goBack}
+              history={[]}
+              onSubmit={handleRefinement}
             />
           </div>
         </main>

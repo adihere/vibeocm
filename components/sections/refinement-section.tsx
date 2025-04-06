@@ -11,30 +11,29 @@ import { AlertCircle, RefreshCw } from "lucide-react"
 
 interface RefinementSectionProps {
   content: string
-  history: string[] // Add history prop
+  history?: string[]
   artifactType: string
-  isSubmitting: boolean // Change isRefining to isSubmitting to match usage
-  error?: string | null // Make error optional since some usages don't provide it
-  onSubmit: (feedback: string, focus: string[]) => Promise<void> // Update to match usage
+  isSubmitting: boolean
+  error?: string | null
+  onSubmit: (feedback: string, focus?: string[]) => Promise<void>
   onBack: () => void
 }
 
 export function RefinementSection({
   content,
-  history, // Add history to destructuring
+  history = [],
   artifactType,
-  isSubmitting, // Change prop name
+  isSubmitting,
   error,
-  onSubmit, // Change onRefine to onSubmit
+  onSubmit,
   onBack,
 }: RefinementSectionProps) {
   const [feedback, setFeedback] = useState("")
-  const [focusAreas, setFocusAreas] = useState<string[]>([]) // Add state for focus areas
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (feedback.trim()) {
-      onSubmit(feedback, focusAreas) // Pass both feedback and focus areas
+      onSubmit(feedback)
     }
   }
 

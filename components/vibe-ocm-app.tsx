@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ApiProvider } from './vibe-ocm-single-page'
+import { ApiProvider } from '@/lib/types'
+
 import { HeroSection } from '@/components/sections/hero-section'
 import { ToolOverviewSection } from '@/components/sections/tool-overview-section'
 import { HowItWorksSection } from '@/components/sections/how-it-works-section'
@@ -12,6 +13,9 @@ import { RefinementSection } from '@/components/sections/refinement-section'
 
 // Define the types for our form data
 import { AuthMethod } from './vibe-ocm-single-page'
+
+// If the type is not exported from vibe-ocm-single-page, define it here:
+// export type AuthMethod = 'none' | 'api_key' | 'oauth';
 
 export interface ProjectData {
   // Project Basics
@@ -59,8 +63,8 @@ export function VibeOCMApp() {
     userBenefits: '',
     challenges: '',
     apiKey: '',
-    apiProvider: 'OPENAI',
-    authMethod: ''
+    apiProvider: 'openai',
+    authMethod: 'trial'
   })
   const [selectedArtifact, setSelectedArtifact] = useState<string>('')
   const [generatedContent, setGeneratedContent] = useState<string>('')
@@ -124,7 +128,7 @@ export function VibeOCMApp() {
   }
   
   // Handler for refinement submission
-  const handleRefinementSubmit = async (feedback: string, focus: string[]) => {
+  const handleRefinementSubmit = async (feedback: string, focus: string[] = []) => {
     setIsGenerating(true)
     
     try {
@@ -243,6 +247,7 @@ export function VibeOCMApp() {
                 onSubmit={handleRefinementSubmit}
                 onBack={goBack}
                 isSubmitting={isGenerating}
+                artifactType={selectedArtifact}
               />
             )}
           </div>

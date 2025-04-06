@@ -21,6 +21,10 @@ interface LangChainConfig {
   maxTokens?: number
   /** Temperature for controlling randomness (0-1) */
   temperature?: number
+  /** Feedback for refinement (if refining existing content) */
+  refinementFeedback?: string
+  /** Current content (if refining) */
+  currentContent?: string
 }
 
 /**
@@ -45,7 +49,6 @@ interface LangChainResponse {
  */
 function createOpenAIChatModel(config: LangChainConfig) {
   const { apiKey, model, temperature = 0.7, maxTokens = 2000 } = config
-
   return new ChatOpenAI({
     openAIApiKey: apiKey,
     modelName: model,
@@ -74,7 +77,7 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
           model: model,
@@ -87,13 +90,19 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
         }),
       })
 
-      const responseData = await response.json()
-
+      // Check if response is OK before trying to parse JSON
       if (!response.ok) {
-        const errorMessage = responseData.error?.message || 
-                           responseData.detail || 
-                           `Mistral API request failed with status ${response.status}`
-        throw new Error(errorMessage)
+        const errorText = await response.text();
+        throw new Error(`Mistral API request failed with status ${response.status}: ${errorText}`);
+      }
+      
+      // Parse response as JSON
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (jsonError) {
+        const rawText = await response.text();
+        throw new Error(`Failed to parse Mistral API response as JSON: ${rawText.substring(0, 100)}...`);
       }
 
       if (!responseData.choices?.[0]?.message?.content) {
@@ -103,14 +112,12 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
       return responseData.choices[0].message.content
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
-      
       // Log the attempt failure
       logger.warn(`Mistral API attempt ${attempt + 1} failed:`, {
         error: lastError.message,
         attempt: attempt + 1,
         maxRetries
       })
-
       // Only wait and retry if we haven't reached max retries
       if (attempt < maxRetries - 1) {
         // Exponential backoff: wait longer between each retry
@@ -139,7 +146,6 @@ export async function generateOCMArtifactWithLangChain(
   config: LangChainConfig,
 ): Promise<string> {
   const startTime = Date.now()
-
   try {
     logger.info(
       `Generating ${artifactType} using ${config.apiProvider === "openai" ? "LangChain" : "Direct API"} with ${config.apiProvider} for project ${projectData.name}`,
@@ -149,25 +155,20 @@ export async function generateOCMArtifactWithLangChain(
     const promptTemplate =
       ARTIFACT_TYPE_TO_PROMPT[artifactType] ||
       `Generate a ${artifactType} for the following project details:\n\n{projectDetails}`
-
     // Format the prompt with project data
     const userPrompt = formatPromptWithProjectData(promptTemplate, projectData)
 
     let result: string
-
     if (config.apiProvider === "openai") {
       // Use LangChain for OpenAI
       const model = createOpenAIChatModel(config)
-
       // Create a prompt template
       const chatPrompt = ChatPromptTemplate.fromMessages([
         SystemMessagePromptTemplate.fromTemplate(SYSTEM_PROMPT),
         HumanMessagePromptTemplate.fromTemplate(userPrompt),
       ])
-
       // Create a chain
       const chain = chatPrompt.pipe(model).pipe(new StringOutputParser())
-
       // Execute the chain
       result = await chain.invoke({})
     } else {
@@ -176,7 +177,6 @@ export async function generateOCMArtifactWithLangChain(
     }
 
     const latencyMs = Date.now() - startTime
-
     // Log and capture metrics
     logger.info(`Generated ${artifactType} in ${latencyMs}ms`, {
       artifactType,
@@ -188,16 +188,12 @@ export async function generateOCMArtifactWithLangChain(
     })
 
     return result
-
   } catch (error) {
     const latencyMs = Date.now() - startTime
-
     // Log the error
     logger.error(`Failed to generate ${artifactType} with ${config.apiProvider}`, error)
-
     // Provide a more helpful error message
     let errorMessage = `Failed to generate ${artifactType}. `
-
     if (error instanceof Error) {
       errorMessage += error.message
     } else {
@@ -232,4 +228,3 @@ export function getDefaultModelForProvider(provider: ApiProvider): string {
 }
 
 export const DEFAULT_MISTRAL_API_KEY = process.env.NEXT_PUBLIC_MISTRAL_API_KEY || '';
-
