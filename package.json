@@ -11,6 +11,7 @@
   "dependencies": {
     "@hookform/resolvers": "latest",
     "@langchain/core": "latest",
+    "@langchain/mistralai": "^0.2.0",
     "@langchain/openai": "latest",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "latest",

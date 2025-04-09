@@ -1,11 +1,16 @@
 import { ChatOpenAI } from "@langchain/openai"
+import { MistralAI } from "@langchain/mistralai";
 import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate } from "@langchain/core/prompts"
 import { logger } from "@/lib/logger"
-//import { captureLLMMetrics } from "@/lib/posthog"
+import { logError } from './error-logger'
 import type { ProjectData } from "@/components/vibe-ocm-single-page"
 import type { ApiProvider } from "@/lib/types"
 import { SYSTEM_PROMPT, ARTIFACT_TYPE_TO_PROMPT, formatPromptWithProjectData } from "@/prompts.config"
+
+const CONSOLE_DEBUGGING_ENABLED = process.env.NEXT_PUBLIC_CONSOLE_DEBUGGING_ENABLED === "true" || false
+
+console.log("Console debugging enabled:", CONSOLE_DEBUGGING_ENABLED)
 
 /**
  * Configuration for LangChain API requests
@@ -93,9 +98,13 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
       // Check if response is OK before trying to parse JSON
       if (!response.ok) {
         const errorText = await response.text();
+        // Log the error response for debugging
+        if (CONSOLE_DEBUGGING_ENABLED) {
+          console.log("Mistral API error response:", errorText);
+        }
         throw new Error(`Mistral API request failed with status ${response.status}: ${errorText}`);
       }
-      
+
       // Parse response as JSON
       let responseData;
       try {
@@ -112,12 +121,15 @@ async function callMistralAPI(systemPrompt: string, userPrompt: string, config: 
       return responseData.choices[0].message.content
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
-      // Log the attempt failure
-      logger.warn(`Mistral API attempt ${attempt + 1} failed:`, {
-        error: lastError.message,
+      // Log error with context
+      const logEntry = logError(lastError, 'Mistral API Call', {
         attempt: attempt + 1,
-        maxRetries
-      })
+        maxRetries,
+        apiProvider: config.apiProvider,
+        model: config.model
+      });
+      logger.warn(`Mistral API attempt ${attempt + 1} failed:`, logEntry);
+      
       // Only wait and retry if we haven't reached max retries
       if (attempt < maxRetries - 1) {
         // Exponential backoff: wait longer between each retry
@@ -155,20 +167,25 @@ export async function generateOCMArtifactWithLangChain(
     const promptTemplate =
       ARTIFACT_TYPE_TO_PROMPT[artifactType] ||
       `Generate a ${artifactType} for the following project details:\n\n{projectDetails}`
+    
     // Format the prompt with project data
     const userPrompt = formatPromptWithProjectData(promptTemplate, projectData)
-
+    
     let result: string
+    
     if (config.apiProvider === "openai") {
       // Use LangChain for OpenAI
       const model = createOpenAIChatModel(config)
+      
       // Create a prompt template
       const chatPrompt = ChatPromptTemplate.fromMessages([
         SystemMessagePromptTemplate.fromTemplate(SYSTEM_PROMPT),
         HumanMessagePromptTemplate.fromTemplate(userPrompt),
       ])
+      
       // Create a chain
       const chain = chatPrompt.pipe(model).pipe(new StringOutputParser())
+      
       // Execute the chain
       result = await chain.invoke({})
     } else {
@@ -186,12 +203,18 @@ export async function generateOCMArtifactWithLangChain(
       latencyMs,
       usedLangChain: config.apiProvider === "openai",
     })
-
+    
     return result
   } catch (error) {
     const latencyMs = Date.now() - startTime
-    // Log the error
-    logger.error(`Failed to generate ${artifactType} with ${config.apiProvider}`, error)
+    logError(error, 'Generate OCM Artifact', {
+      artifactType,
+      projectName: projectData.name,
+      provider: config.apiProvider,
+      model: config.model,
+      latencyMs
+    })
+    
     // Provide a more helpful error message
     let errorMessage = `Failed to generate ${artifactType}. `
     if (error instanceof Error) {
@@ -199,14 +222,99 @@ export async function generateOCMArtifactWithLangChain(
     } else {
       errorMessage += `Please check your ${config.apiProvider} API key and try again.`
     }
-
+    
     // Add provider-specific troubleshooting tips
     if (config.apiProvider === "mistral") {
       errorMessage += " Make sure you're using a valid Mistral API key from https://console.mistral.ai/api-keys/"
     } else if (config.apiProvider === "openai") {
       errorMessage += " Make sure you're using a valid OpenAI API key from https://platform.openai.com/api-keys"
     }
+    
+    throw new Error(errorMessage)
+  }
+}
 
+/**
+ * Generates an OCM artifact using LangChain for Mistral
+ *
+ * @param artifactType - The type of artifact to generate (e.g., "Change Management Plan")
+ * @param projectData - The project data to use for generation
+ * @param config - Configuration for the LangChain request
+ * @returns The generated artifact content as a string
+ * @throws Error if the LangChain request fails
+ */
+export async function generateOCMArtifactWithLangChainMistral(
+  artifactType: string,
+  projectData: ProjectData,
+  config: LangChainConfig,
+): Promise<string> {
+  const startTime = Date.now()
+  try {
+    logger.info(
+      `Generating ${artifactType} using LangChain with Mistral for project ${projectData.name}`,
+    )
+
+    // Get the appropriate prompt template for this artifact type
+    const promptTemplate =
+      ARTIFACT_TYPE_TO_PROMPT[artifactType] ||
+      `Generate a ${artifactType} for the following project details:\n\n{projectDetails}`
+    
+    // Format the prompt with project data
+    const userPrompt = formatPromptWithProjectData(promptTemplate, projectData)
+    
+    // Create a MistralAI instance using LangChain
+    const { apiKey, model, temperature = 0.7, maxTokens = 2000 } = config
+    const llm = new MistralAI({
+      apiKey: apiKey,
+      model: model,
+      temperature: temperature,
+      maxTokens: maxTokens,
+    })
+    
+    // Create a prompt template
+    const chatPrompt = ChatPromptTemplate.fromMessages([
+      SystemMessagePromptTemplate.fromTemplate(SYSTEM_PROMPT),
+      HumanMessagePromptTemplate.fromTemplate(userPrompt),
+    ])
+    
+    // Create a chain
+    const chain = chatPrompt.pipe(llm).pipe(new StringOutputParser())
+    
+    // Execute the chain
+    const result = await chain.invoke({})
+
+    const latencyMs = Date.now() - startTime
+    // Log and capture metrics
+    logger.info(`Generated ${artifactType} in ${latencyMs}ms`, {
+      artifactType,
+      projectName: projectData.name,
+      provider: "mistral",
+      model: config.model,
+      latencyMs,
+      usedLangChain: true,
+    })
+    
+    return result
+  } catch (error) {
+    const latencyMs = Date.now() - startTime
+    logError(error, 'Generate OCM Artifact with Mistral', {
+      artifactType,
+      projectName: projectData.name,
+      provider: "mistral",
+      model: config.model,
+      latencyMs
+    })
+    
+    // Provide a more helpful error message
+    let errorMessage = `Failed to generate ${artifactType} with Mistral. `
+    if (error instanceof Error) {
+      errorMessage += error.message
+    } else {
+      errorMessage += `Please check your Mistral API key and try again.`
+    }
+    
+    errorMessage += " Make sure you're using a valid Mistral API key from https://console.mistral.ai/api-keys/"
+    
     throw new Error(errorMessage)
   }
 }

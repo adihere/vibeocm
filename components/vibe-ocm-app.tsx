@@ -121,7 +121,11 @@ export function VibeOCMApp() {
       // Scroll to results section
       setTimeout(() => scrollToResults(), 100)
     } catch (error) {
-      console.error('Error generating artifact:', error)
+      console.error('Error generating artifact:', error, {
+        artifact,
+        projectName: projectData.name,
+        provider: projectData.apiProvider
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -144,7 +148,11 @@ export function VibeOCMApp() {
       // Scroll to results section
       setTimeout(() => scrollToResults(), 100)
     } catch (error) {
-      console.error('Error refining content:', error)
+      console.error('Error refining content:', error, {
+        artifact: selectedArtifact,
+        projectName: projectData.name,
+        provider: projectData.apiProvider
+      })
     } finally {
       setIsGenerating(false)
     }
